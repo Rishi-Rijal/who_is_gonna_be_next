@@ -1,43 +1,33 @@
-export class ApiError extends Error {
-  public readonly statusCode: number;
-  public readonly isOperational: boolean;
-  public readonly errors: unknown[] | undefined;
+import { Response } from "express";
 
-  constructor(
-    statusCode: number,
-    message: string,
-    isOperational = true,
-    errors?: unknown[],
-  ) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    this.errors = errors;
-    Object.setPrototypeOf(this, new.target.prototype);
-    Error.captureStackTrace(this);
-  }
-
-  static badRequest(message: string, errors?: unknown[]) {
-    return new ApiError(400, message, true, errors);
-  }
-
-  static unauthorized(message = "Unauthorized") {
-    return new ApiError(401, message);
-  }
-
-  static forbidden(message = "Forbidden") {
-    return new ApiError(403, message);
-  }
-
-  static notFound(message = "Not found") {
-    return new ApiError(404, message);
-  }
-
-  static conflict(message: string) {
-    return new ApiError(409, message);
-  }
-
-  static internal(message = "Internal server error") {
-    return new ApiError(500, message, false);
-  }
+interface ApiResponseOptions {
+  message?: string;
+  statusCode?: number;
 }
+
+export const apiResponse = {
+  success<T>(res: Response, data: T, options: ApiResponseOptions = {}) {
+    const { message = "Success", statusCode = 200 } = options;
+    return res.status(statusCode).json({
+      success: true,
+      message,
+      data,
+    });
+  },
+
+  created<T>(
+    res: Response,
+    data: T,
+    options: Omit<ApiResponseOptions, "statusCode"> = {},
+  ) {
+    return apiResponse.success(res, data, {
+      ...options,
+      statusCode: 201,
+      message: options.message ?? "Created",
+    });
+  },
+
+  noContent(res: Response) {
+    return res.status(204).send();
+  },
+};
