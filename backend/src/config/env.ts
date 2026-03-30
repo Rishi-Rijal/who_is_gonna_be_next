@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ApiError } from "../shared/utils/apiError";
 
 export const envSchema = z.object({
   PORT: z.string().default("3000"),
@@ -11,10 +12,14 @@ export type Env = z.infer<typeof envSchema>;
 export const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-    // TODO: use a ApiError class to handle this more gracefully
-  console.error("Environment variable validation failed:", parsed.error.format());
-  process.exit(1);
+  console.error(
+    "Environment variable validation failed:",
+    parsed.error.format(),
+  );
+  throw ApiError.badRequest(
+    "Environment variable validation failed",
+    parsed.error.issues,
+  );
 }
 
 export const env: Env = parsed.data;
-
