@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { env } from "../../config/env";
 import { apiResponse } from "../../shared/utils/apiResponse";
 import { ApiError } from "../../shared/utils/apiError";
-import { createUserSchema } from "./auth.schema";
+import { createUserSchema } from "./auth.validation";
 import { createUser, getUserByClerkId } from "./auth.service";
 
 const getWebhookHeaders = (req: Request): Record<string, string> => {
