@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { env } from "../config/env";
-// import * as schema from "../schema"; -- IGNORE ---
+import * as schema from "./schema";
 
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
@@ -20,7 +20,7 @@ pool.on("error", (err) => {
   process.exit(1);
 });
 
-export const db = drizzle(pool); //, { schema } --- IGNORE ---;
+export const db = drizzle(pool, { schema });
 
 export async function checkDatabaseConnection(): Promise<void> {
   try {

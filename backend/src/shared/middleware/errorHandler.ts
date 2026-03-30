@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { ZodError } from "zod";
 import { ApiError } from "../utils/apiError";
 export const errorHandler = (
   err: Error,
@@ -7,6 +8,18 @@ export const errorHandler = (
   _next: NextFunction,
 ) => {
   void _next;
+  void req;
+
+  if (err instanceof ZodError) {
+    const firstIssue = err.issues[0];
+    const message = firstIssue?.message ?? "Validation failed";
+
+    return res.status(400).json({
+      success: false,
+      message,
+      errors: err.issues,
+    });
+  }
 
   if (err instanceof ApiError) {
     return res.status(err.statusCode).json({
