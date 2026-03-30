@@ -1,4 +1,4 @@
-import { CreateUserData } from "./auth.schema";
+import { CreateUserData } from "./auth.validation";
 import { db } from "../../db/db.config";
 import { users } from "../../db/schema";
 import { eq } from "drizzle-orm";
