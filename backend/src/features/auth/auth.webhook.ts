@@ -1,72 +1,67 @@
 import { Webhook } from "svix";
 import type { WebhookEvent } from "@clerk/express/webhooks";
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import { env } from "../../config/env";
 import { apiResponse } from "../../shared/utils/apiResponse";
 import { ApiError } from "../../shared/utils/apiError";
 import { createUserSchema } from "./auth.validation";
 import { createUser, getUserByClerkId } from "./auth.service";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
+import { RequestWithRawBody } from "../../types/global";
+ 
+const getWebhookHeaders = (req: RequestWithRawBody): Record<string, string> => {
+  const headers = {
+    "svix-id": req.header("svix-id"),
+    "svix-timestamp": req.header("svix-timestamp"),
+    "svix-signature": req.header("svix-signature"),
+  };
 
-const getWebhookHeaders = (req: Request): Record<string, string> => {
-  const headerNames = [
-    "webhook-id",
-    "webhook-timestamp",
-    "webhook-signature",
-  ] as const;
-  const headers: Record<string, string> = {};
-
-  for (const headerName of headerNames) {
-    const value = req.header(headerName);
-
-    if (!value) {
-      throw new ApiError(400, `Missing webhook header: ${headerName}`);
-    }
-
-    headers[headerName] = value;
+  if (!headers["svix-id"] || !headers["svix-timestamp"] || !headers["svix-signature"]) {
+    throw new ApiError(400, "Missing svix headers");
   }
 
-  return headers;
+  return headers as Record<string, string>;
 };
 
 export const handleClerkWebhook = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: RequestWithRawBody, res: Response) => {
     const wh = new Webhook(env.CLERK_WEBHOOK_SECRET);
     const headers = getWebhookHeaders(req);
 
-    const rawBody = (req as Request & { rawBody?: string | Buffer }).rawBody;
+    // Use the rawBody Buffer attached by middleware
+    const rawBody = req.rawBody;
+    
     if (!rawBody) {
       throw new ApiError(400, "Missing raw body for webhook verification");
     }
 
     let event: WebhookEvent;
     try {
+      // Svix accepts Buffer, so we pass it directly
       event = wh.verify(rawBody, headers) as WebhookEvent;
-    } catch {
-      throw new ApiError(400, "Invalid webhook");
+    } catch (err) {
+      throw new ApiError(400, "Invalid webhook signature");
     }
 
     switch (event.type) {
       case "user.created": {
-        const parsed = createUserSchema.safeParse(event.data);
+        // Mapping Clerk's 'id' to your internal 'clerkId' schema
+        const payload = {
+          ...event.data,
+          clerkId: event.data.id,
+        };
+
+        const parsed = createUserSchema.safeParse(payload);
         if (!parsed.success) {
           throw new ApiError(400, "Invalid user data");
         }
 
-        const user = await getUserByClerkId(parsed.data.clerkId);
-        if (user) {
-          break;
-        }
+        const existingUser = await getUserByClerkId(parsed.data.clerkId);
+        if (existingUser) break;
+
         await createUser(parsed.data);
         break;
       }
-      // TODO: Handle user updation and deletion
-      // case "user.updated": // later
-      //   await handleUserUpdated(event.data);
-      //   break;
-      // case "user.deleted": // later
-      //   await handleUserDeleted(event.data);
-      //   break;
     }
 
     return apiResponse.noContent(res);

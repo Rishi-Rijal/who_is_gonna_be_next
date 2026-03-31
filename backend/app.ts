@@ -7,11 +7,18 @@ import { apiResponse } from "./src/shared/utils/apiResponse";
 import { errorHandler } from "./src/shared/middleware/errorHandler";
 import { authRouter } from "./src/features/auth/auth.router";
 import { corsService } from "./src/shared/utils/cors";
+import type { RequestWithRawBody } from "./src/types/global";
 
 const app = express();
 
 app.use(corsService);
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as RequestWithRawBody).rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(clerkMiddleware());
 app.use(attachUser);
