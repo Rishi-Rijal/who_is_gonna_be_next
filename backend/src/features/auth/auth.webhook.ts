@@ -53,7 +53,11 @@ export const handleClerkWebhook = asyncHandler(
 
         const parsed = createUserSchema.safeParse(payload);
         if (!parsed.success) {
-          throw new ApiError(400, "Invalid user data");
+          const firstIssue = parsed.error.issues[0]?.message;
+          throw new ApiError(
+            400,
+            firstIssue ? `Invalid user data: ${firstIssue}` : "Invalid user data",
+          );
         }
 
         const existingUser = await getUserByClerkId(parsed.data.clerkId);
