@@ -3,34 +3,45 @@ import { ApiError } from "../../shared/utils/apiError";
 import { getAuth } from "@clerk/express";
 import { getUserByClerkId } from "./auth.service";
 
-export async function attachUser(
+export const attachUser = async (
   req: Request,
   res: Response,
   next: NextFunction,
-) {
-  const { userId: clerkId } = getAuth(req);
+): Promise<void> => {
+  try {
+    const { userId: clerkId } = getAuth(req);
 
-  if (!clerkId) return next(); // also for non-auth routes
+    if (!clerkId) return next();
 
-  const user = await getUserByClerkId(clerkId);
-
-  req.user = user;
-
-  next();
-}
-
-export async function requireRoles(roles: string[]) {
-  return async function (req: Request, res: Response, next: NextFunction) {
-    if (!req.user) {
-      return next(new ApiError(401, "Unauthorized"));
-    }
-
-    const hasRole = roles.some((role) => req.user?.role.includes(role));
-
-    if (!hasRole) {
-      return next(new ApiError(403, "Forbidden"));
-    }
+    const user = await getUserByClerkId(clerkId);
+    req.user = user;
 
     next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const requireRoles = (roles: string[]) => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw ApiError.unauthorized("Unauthorized");
+      }
+
+      const hasRole = roles.some((role) => req.user?.role.includes(role));
+
+      if (!hasRole) {
+        throw ApiError.forbidden("Forbidden");
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
-}
+};
