@@ -4,7 +4,7 @@ import { ArresteeAddInsert, ArresteeUpdateInsert } from "./arrestee.validation";
 import { desc, eq, sql } from "drizzle-orm";
 
 export async function getAllArrestees() {
-  return await db.select().from(arrestee).orderBy(desc(arrestee.likes));
+  return await db.select().from(arrestee).orderBy(desc(arrestee.totalVotes));
 }
 
 export async function createArrestee(data: ArresteeAddInsert) {

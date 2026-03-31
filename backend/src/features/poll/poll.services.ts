@@ -37,8 +37,7 @@ export async function getAllPolls() {
       options: pollOptions,
     })
     .from(polls)
-    .leftJoin(pollOptions, eq(polls.id, pollOptions.pollId))
-    .orderBy(desc(polls.createdAt));
+    .leftJoin(pollOptions, eq(polls.id, pollOptions.pollId));
 
   // Group options by poll
   const pollsMap = new Map();
@@ -51,7 +50,24 @@ export async function getAllPolls() {
     }
   });
 
-  return Array.from(pollsMap.values());
+  // Convert to array and sort options by voteCount desc
+
+  type Option = typeof pollOptions.$inferSelect;
+  type PollWithOptions = typeof polls.$inferSelect & { options: Option[] };
+
+  let pollsArr = Array.from(pollsMap.values()).map((poll: PollWithOptions) => ({
+    ...poll,
+    options: poll.options.sort((a: Option, b: Option) => (b.voteCount || 0) - (a.voteCount || 0)),
+  }));
+
+  // Sort polls by total engagement (sum of option votes) desc
+  pollsArr = pollsArr.sort((a: PollWithOptions, b: PollWithOptions) => {
+    const aVotes = a.options.reduce((sum: number, o: Option) => sum + (o.voteCount || 0), 0);
+    const bVotes = b.options.reduce((sum: number, o: Option) => sum + (o.voteCount || 0), 0);
+    return bVotes - aVotes;
+  });
+
+  return pollsArr;
 }
 
 // Get a specific poll by ID with its options

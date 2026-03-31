@@ -29,6 +29,13 @@ export const errorHandler = (
     });
   }
 
+  if (err.message.startsWith("CORS:")) {
+    return res.status(403).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
   console.error(err);
   return res.status(500).json({
     success: false,
