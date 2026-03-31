@@ -1,9 +1,10 @@
 import cors from "cors";
-
+import { env } from "../../config/env";
 
 const allowedOrigins = [
-  'https://who-is-going-to-be-next.vercel.app',
-  'http://localhost:5173',  
+  env.FRONTEND_URL,
+  "https://who-is-going-to-be-next.vercel.app",
+  "http://localhost:5173",
 ];
 
 export const corsService = cors({
@@ -16,7 +17,7 @@ export const corsService = cors({
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     }
   },
-  credentials: true,      
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 });
