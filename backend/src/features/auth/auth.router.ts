@@ -3,7 +3,6 @@ import { Router } from "express";
 
 const authRouter = Router();
 
-
 authRouter.post("/webhook/clerk", handleClerkWebhook);
 
-export {authRouter};
+export { authRouter };
