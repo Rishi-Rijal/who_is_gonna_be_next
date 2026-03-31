@@ -12,7 +12,7 @@ const startServer = async () => {
     await checkDatabaseConnection();
 
     const server = app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Server running on port ${PORT}`);
     });
 
     const shutdown = async (signal: string) => {
