@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const epochToDate = (value: unknown): Date | null => {
+  if (value === null || value === undefined) return null;
+
+  const numeric = typeof value === "string" ? Number(value) : value;
+  if (typeof numeric !== "number" || !Number.isFinite(numeric)) return null;
+
+  // Unix seconds are typically 10 digits; milliseconds are 13 digits.
+  const millis = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  const parsed = new Date(millis);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 // used snake_case to match clerk's API response
 export const createUserSchema = z
   .object({
@@ -15,10 +28,8 @@ export const createUserSchema = z
     id: z.string("User ID must be a string"),
     first_name: z.string().nullable().optional(),
     last_name: z.string().nullable().optional(),
-    updated_at: z.number("Time must be in mil.liseconds since epoch"),
-    last_sign_in_at: z
-      .number("Time must be in milliseconds since epoch")
-      .optional(),
+    updated_at: z.union([z.number(), z.string(), z.null()]).optional(),
+    last_sign_in_at: z.union([z.number(), z.string(), z.null()]).optional(),
   })
   .refine(
     (data) => {
@@ -45,8 +56,8 @@ export const createUserSchema = z
       clerkId: data.id,
       firstName: data.first_name?.trim() || "Unknown",
       lastName: data.last_name?.trim() || null,
-      updatedAt: data.updated_at ? new Date(data.updated_at) : new Date(),
-      lastLoginAt: data.last_sign_in_at ? new Date(data.last_sign_in_at) : null,
+      updatedAt: epochToDate(data.updated_at) ?? new Date(),
+      lastLoginAt: epochToDate(data.last_sign_in_at),
       createdAt: new Date(),
     };
   });
