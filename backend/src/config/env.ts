@@ -6,6 +6,7 @@ export const envSchema = z.object({
   DATABASE_URL: z.string(),
   CLERK_WEBHOOK_SECRET: z.string().min(1, "CLERK_WEBHOOK_SECRET is required"),
   FRONTEND_URL: z.url().default("http://localhost:5173"),
+  FRONTEND_URLS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

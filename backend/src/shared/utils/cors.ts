@@ -1,11 +1,22 @@
 import cors from "cors";
 import { env } from "../../config/env";
 
-const allowedOrigins = [
-  env.FRONTEND_URL,
-  "https://who-is-going-to-be-next.vercel.app",
-  "http://localhost:5173",
-];
+const parseOriginList = (value?: string): string[] => {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
+const allowedOrigins = Array.from(
+  new Set([
+    ...parseOriginList(env.FRONTEND_URLS),
+    "https://who-is-going-to-be-next.vercel.app",
+    "http://localhost:5173",
+  ]),
+);
 
 export const corsService = cors({
   origin: (origin, callback) => {
