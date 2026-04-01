@@ -8,7 +8,7 @@ import { createUserSchema } from "./auth.validation";
 import { createUser, getUserByClerkId } from "./auth.service";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
 import { RequestWithRawBody } from "../../types/global";
- 
+
 const getWebhookHeaders = (req: RequestWithRawBody): Record<string, string> => {
   const headers = {
     "svix-id": req.header("svix-id"),
@@ -16,7 +16,11 @@ const getWebhookHeaders = (req: RequestWithRawBody): Record<string, string> => {
     "svix-signature": req.header("svix-signature"),
   };
 
-  if (!headers["svix-id"] || !headers["svix-timestamp"] || !headers["svix-signature"]) {
+  if (
+    !headers["svix-id"] ||
+    !headers["svix-timestamp"] ||
+    !headers["svix-signature"]
+  ) {
     throw new ApiError(400, "Missing svix headers");
   }
 
@@ -30,7 +34,7 @@ export const handleClerkWebhook = asyncHandler(
 
     // Use the rawBody Buffer attached by middleware
     const rawBody = req.rawBody;
-    
+
     if (!rawBody) {
       throw new ApiError(400, "Missing raw body for webhook verification");
     }
@@ -56,7 +60,9 @@ export const handleClerkWebhook = asyncHandler(
           const firstIssue = parsed.error.issues[0]?.message;
           throw new ApiError(
             400,
-            firstIssue ? `Invalid user data: ${firstIssue}` : "Invalid user data",
+            firstIssue
+              ? `Invalid user data: ${firstIssue}`
+              : "Invalid user data",
           );
         }
 

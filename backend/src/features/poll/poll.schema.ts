@@ -39,7 +39,12 @@ export const pollOptions = pgTable(
       .references(() => polls.id, { onDelete: "cascade" }),
     optionTextEn: varchar("option_text_en", { length: 500 }).notNull(),
     optionTextNp: varchar("option_text_np", { length: 500 }).notNull(),
+    optionImageUrl: varchar("option_image_url", { length: 255 }),
+    optionImageUrlPublicId: varchar("option_image_url_public_id", {
+      length: 255,
+    }),
     voteCount: integer("vote_count").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [index("poll_option_poll_id_idx").on(table.pollId)],

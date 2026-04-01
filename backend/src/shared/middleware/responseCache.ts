@@ -17,7 +17,9 @@ const responseCache = new Map<string, CacheEntry>();
 const isCacheableRequest = (req: Request) => req.method === "GET";
 
 const getCacheKey = (req: Request, options: CacheOptions) => {
-  const userSuffix = options.varyByUser ? `:user:${req.user?.id ?? "anon"}` : "";
+  const userSuffix = options.varyByUser
+    ? `:user:${req.user?.id ?? "anon"}`
+    : "";
 
   return `${options.namespace}:${req.method}:${req.originalUrl}${userSuffix}`;
 };
@@ -56,7 +58,9 @@ export const cacheResponse = (options: CacheOptions): RequestHandler => {
 
     if (cachedEntry) {
       res.setHeader("X-Cache", "HIT");
-      return res.status(cachedEntry.statusCode).json(cloneBody(cachedEntry.body));
+      return res
+        .status(cachedEntry.statusCode)
+        .json(cloneBody(cachedEntry.body));
     }
 
     const originalJson = res.json.bind(res);

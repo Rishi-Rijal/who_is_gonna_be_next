@@ -5,6 +5,8 @@ import {
   getAllPolls,
   getPollById,
   addOptionToPoll,
+  updatePollOption,
+  getPollOptionById,
   voteOnOption,
   getUserVoteOnPoll,
   deletePoll,
@@ -13,12 +15,80 @@ import {
 import {
   createPollSchema,
   addPollOptionSchema,
+  updatePollOptionSchema,
   voteOnOptionSchema,
 } from "./poll.validation";
 import { asyncHandler } from "../../shared/utils/asyncHandler";
 import { apiResponse } from "../../shared/utils/apiResponse";
 import { ApiError } from "../../shared/utils/apiError";
 import { invalidateCacheNamespace } from "../../shared/middleware/responseCache";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../../shared/utils/cloudinary";
+
+const POLL_OPTION_UPLOAD_FOLDER = "poll-options";
+
+const getUploadedFiles = (req: Request): Express.Multer.File[] => {
+  if (Array.isArray(req.files)) {
+    return req.files;
+  }
+
+  if (req.file) {
+    return [req.file];
+  }
+
+  return [];
+};
+
+const getUploadedFileByFieldname = (
+  req: Request,
+  fieldname: string,
+): Express.Multer.File | undefined => {
+  return getUploadedFiles(req).find((file) => file.fieldname === fieldname);
+};
+
+const parsePollOptions = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    throw ApiError.badRequest("Poll options are required");
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      throw new Error();
+    }
+
+    return parsed;
+  } catch {
+    throw ApiError.badRequest("Invalid poll options format");
+  }
+};
+
+const uploadOptionImage = async (file: Express.Multer.File) => {
+  return uploadToCloudinary(
+    file.buffer,
+    file.mimetype,
+    POLL_OPTION_UPLOAD_FOLDER,
+  );
+};
+
+const deleteUploadedImages = async (publicIds: string[]) => {
+  await Promise.all(
+    publicIds.map(async (publicId) => {
+      try {
+        await deleteFromCloudinary(publicId);
+      } catch {
+        // Ignore cleanup errors so the original request error is preserved.
+      }
+    }),
+  );
+};
 
 // Helper to get client IP address
 const getClientIP = (req: Request): string => {
@@ -54,21 +124,58 @@ const parseIdFromParams = (req: Request): string => {
 
 export const createPollController = asyncHandler(
   async (req: Request, res: Response) => {
-    const validationResult = createPollSchema.safeParse(req.body);
+    const uploadedPublicIds: string[] = [];
+    const optionsWithImages = [] as unknown[];
+
+    try {
+      const options = parsePollOptions(req.body.options);
+
+      for (let index = 0; index < options.length; index += 1) {
+        const option = options[index] as Record<string, unknown>;
+        const file = getUploadedFileByFieldname(req, `optionImage_${index}`);
+
+        if (file) {
+          const uploadedImage = await uploadOptionImage(file);
+          uploadedPublicIds.push(uploadedImage.public_id);
+
+          optionsWithImages.push({
+            ...option,
+            optionImageUrl: uploadedImage.secure_url,
+            optionImageUrlPublicId: uploadedImage.public_id,
+          });
+        } else {
+          optionsWithImages.push(option);
+        }
+      }
+    } catch (error) {
+      await deleteUploadedImages(uploadedPublicIds);
+      throw error;
+    }
+
+    const validationResult = createPollSchema.safeParse({
+      ...req.body,
+      options: optionsWithImages,
+    });
     if (!validationResult.success) {
+      await deleteUploadedImages(uploadedPublicIds);
       throw ApiError.badRequest(validationResult.error.issues[0].message);
     }
 
-    const poll = await createPoll({
-      ...validationResult.data,
-      createdBy: req.user?.id!,
-    });
+    try {
+      const poll = await createPoll({
+        ...validationResult.data,
+        createdBy: req.user?.id!,
+      });
 
-    invalidateCacheNamespace("poll");
+      invalidateCacheNamespace("poll");
 
-    return apiResponse.created(res, poll, {
-      message: "Poll created successfully",
-    });
+      return apiResponse.created(res, poll, {
+        message: "Poll created successfully",
+      });
+    } catch (error) {
+      await deleteUploadedImages(uploadedPublicIds);
+      throw error;
+    }
   },
 );
 
@@ -114,19 +221,119 @@ export const addOptionToPollController = asyncHandler(
   async (req: Request, res: Response) => {
     const pollId = parseIdFromParams(req);
 
+    const uploadedPublicIds: string[] = [];
+    const file = getUploadedFileByFieldname(req, "optionImage");
+    let uploadedImageData:
+      | { optionImageUrl: string; optionImageUrlPublicId: string }
+      | undefined;
+
+    if (file) {
+      const uploadedImage = await uploadOptionImage(file);
+      uploadedPublicIds.push(uploadedImage.public_id);
+      uploadedImageData = {
+        optionImageUrl: uploadedImage.secure_url,
+        optionImageUrlPublicId: uploadedImage.public_id,
+      };
+    }
+
     const validationResult = addPollOptionSchema.safeParse({
       ...req.body,
       pollId,
+      ...uploadedImageData,
     });
     if (!validationResult.success) {
+      await deleteUploadedImages(uploadedPublicIds);
       throw ApiError.badRequest(validationResult.error.issues[0].message);
     }
 
-    const option = await addOptionToPoll(validationResult.data);
+    try {
+      const option = await addOptionToPoll(validationResult.data);
 
-    return apiResponse.created(res, option, {
-      message: "Option added successfully",
+      invalidateCacheNamespace("poll");
+
+      return apiResponse.created(res, option, {
+        message: "Option added successfully",
+      });
+    } catch (error) {
+      await deleteUploadedImages(uploadedPublicIds);
+      throw error;
+    }
+  },
+);
+
+// Update a poll option
+export const updatePollOptionController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const optionIdResult = z.uuid().safeParse(req.params.optionId);
+    if (!optionIdResult.success) {
+      throw ApiError.badRequest("Invalid option ID");
+    }
+
+    const existingOption = await getPollOptionById(optionIdResult.data);
+    if (!existingOption) {
+      throw ApiError.notFound("Option not found");
+    }
+
+    const file = getUploadedFileByFieldname(req, "optionImage");
+    let uploadedImageData:
+      | { optionImageUrl: string; optionImageUrlPublicId: string }
+      | undefined;
+    let uploadedPublicId: string | undefined;
+
+    if (file) {
+      const uploadedImage = await uploadOptionImage(file);
+      uploadedPublicId = uploadedImage.public_id;
+      uploadedImageData = {
+        optionImageUrl: uploadedImage.secure_url,
+        optionImageUrlPublicId: uploadedImage.public_id,
+      };
+    }
+
+    const validationResult = updatePollOptionSchema.safeParse({
+      ...req.body,
+      ...uploadedImageData,
     });
+
+    if (!validationResult.success) {
+      if (uploadedPublicId) {
+        await deleteUploadedImages([uploadedPublicId]);
+      }
+      throw ApiError.badRequest(validationResult.error.issues[0].message);
+    }
+
+    try {
+      const option = await updatePollOption(
+        optionIdResult.data,
+        validationResult.data,
+      );
+
+      if (!option) {
+        throw ApiError.notFound("Option not found");
+      }
+
+      if (
+        uploadedPublicId &&
+        existingOption.optionImageUrlPublicId &&
+        existingOption.optionImageUrlPublicId !== uploadedPublicId
+      ) {
+        try {
+          await deleteFromCloudinary(existingOption.optionImageUrlPublicId);
+        } catch {
+          // Keep update successful even if image cleanup fails.
+        }
+      }
+
+      invalidateCacheNamespace("poll");
+
+      return apiResponse.success(res, option, {
+        message: "Option updated successfully",
+      });
+    } catch (error) {
+      if (uploadedPublicId) {
+        await deleteUploadedImages([uploadedPublicId]);
+      }
+      throw error;
+    }
   },
 );
 
@@ -151,9 +358,15 @@ export const voteOnOptionController = asyncHandler(
 
       invalidateCacheNamespace("poll");
 
+      const messageByAction = {
+        created: "Vote recorded successfully",
+        updated: "Vote updated successfully",
+        unchanged: "Vote was already on this option",
+      } as const;
+
       return apiResponse.success(res, vote, {
         statusCode: 201,
-        message: "Vote recorded successfully",
+        message: messageByAction[vote.action],
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Voting failed";
@@ -179,7 +392,13 @@ export const deletePollController = asyncHandler(
       throw ApiError.forbidden("You can only delete your own polls");
     }
 
+    const optionImages = poll.options
+      .map((option) => option.optionImageUrlPublicId)
+      .filter((publicId): publicId is string => Boolean(publicId));
+
     await deletePoll(pollId);
+
+    await deleteUploadedImages(optionImages);
     invalidateCacheNamespace("poll");
 
     return apiResponse.success(
@@ -198,7 +417,21 @@ export const deletePollOptionController = asyncHandler(
       throw ApiError.badRequest("Invalid option ID");
     }
 
+    const existingOption = await getPollOptionById(optionId.data);
+    if (!existingOption) {
+      throw ApiError.notFound("Option not found");
+    }
+
     await deletePollOption(optionId.data);
+
+    if (existingOption.optionImageUrlPublicId) {
+      try {
+        await deleteFromCloudinary(existingOption.optionImageUrlPublicId);
+      } catch {
+        // Keep delete successful even if media cleanup fails.
+      }
+    }
+
     invalidateCacheNamespace("poll");
 
     return apiResponse.success(

@@ -14,12 +14,14 @@ const parseOriginList = (value?: string): string[] => {
 };
 
 const allowedOrigins = Array.from(
-  new Set([
-    normalizeOrigin(env.FRONTEND_URL),
-    ...parseOriginList(env.FRONTEND_URLS),
-    "https://who-is-going-to-be-next.vercel.app",
-    "http://localhost:5173",
-  ].map(normalizeOrigin)),
+  new Set(
+    [
+      normalizeOrigin(env.FRONTEND_URL),
+      ...parseOriginList(env.FRONTEND_URLS),
+      "https://who-is-going-to-be-next.vercel.app",
+      "http://localhost:5173",
+    ].map(normalizeOrigin),
+  ),
 );
 
 export const corsService = cors({

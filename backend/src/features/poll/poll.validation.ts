@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const pollOptionSchema = z.object({
+  optionTextEn: z
+    .string()
+    .min(1, "English option text is required")
+    .max(500, "Option must be less than 500 characters"),
+  optionTextNp: z
+    .string()
+    .min(1, "Nepali option text is required")
+    .max(500, "Option must be less than 500 characters"),
+  optionImageUrl: z.string().url().optional(),
+  optionImageUrlPublicId: z.string().min(1).optional(),
+});
+
 export const pollBaseSchema = z.object({
   titleEn: z
     .string()
@@ -21,33 +34,25 @@ export const pollBaseSchema = z.object({
 
 export const createPollSchema = pollBaseSchema.extend({
   options: z
-    .array(
-      z.object({
-        optionTextEn: z
-          .string()
-          .min(1, "English option text is required")
-          .max(500, "Option must be less than 500 characters"),
-        optionTextNp: z
-          .string()
-          .min(1, "Nepali option text is required")
-          .max(500, "Option must be less than 500 characters"),
-      }),
-    )
+    .array(pollOptionSchema)
     .min(2, "At least 2 options are required")
     .max(20, "Maximum 20 options allowed"),
 });
 
 export const addPollOptionSchema = z.object({
-  optionTextEn: z
-    .string()
-    .min(1, "English option text is required")
-    .max(500, "Option must be less than 500 characters"),
-  optionTextNp: z
-    .string()
-    .min(1, "Nepali option text is required")
-    .max(500, "Option must be less than 500 characters"),
+  ...pollOptionSchema.shape,
   pollId: z.uuid("Invalid poll ID"),
 });
+
+export const updatePollOptionSchema = pollOptionSchema
+  .partial()
+  .refine(
+    (data) =>
+      Boolean(data.optionTextEn || data.optionTextNp || data.optionImageUrl),
+    {
+      message: "At least one option field is required",
+    },
+  );
 
 export const voteOnOptionSchema = z.object({
   optionId: z.uuid("Invalid option ID"),
@@ -70,6 +75,8 @@ export type CreatePollInsert = z.infer<typeof createPollSchema> & {
 };
 
 export type AddPollOptionInsert = z.infer<typeof addPollOptionSchema>;
+
+export type UpdatePollOptionInsert = z.infer<typeof updatePollOptionSchema>;
 
 export type VoteOnOptionInsert = z.infer<typeof voteOnOptionSchema> & {
   userId?: string;
