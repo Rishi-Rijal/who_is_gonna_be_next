@@ -22,6 +22,7 @@ import {
   deleteFromCloudinary,
   uploadToCloudinary,
 } from "../../shared/utils/cloudinary";
+import { invalidateCacheNamespace } from "../../shared/middleware/responseCache";
 
 const ARRESTEE_UPLOAD_FOLDER = "arrestees";
 
@@ -123,6 +124,7 @@ export const createArresteeController = asyncHandler(async (req, res) => {
   }
 
   const result = await createArrestee(parsed.data);
+  invalidateCacheNamespace("arrestee");
   return apiResponse.created(res, result, { message: "Arrestee created" });
 });
 
@@ -169,6 +171,7 @@ export const updateArresteeController = asyncHandler(async (req, res) => {
   }
 
   const result = await updateArrestee(parsed.data);
+  invalidateCacheNamespace("arrestee");
 
   if (
     uploadedPublicId &&
@@ -194,6 +197,7 @@ export const deleteArresteeController = asyncHandler(async (req, res) => {
   }
 
   await deleteArrestee(id);
+  invalidateCacheNamespace("arrestee");
 
   if (existing.profileImgUrlPublicId) {
     try {
@@ -214,6 +218,7 @@ export const addLikeController = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Arrestee not found");
   }
 
+  invalidateCacheNamespace("arrestee");
   return apiResponse.success(res, result, { message: "Like added" });
 });
 
@@ -225,6 +230,7 @@ export const removeLikeController = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Arrestee not found");
   }
 
+  invalidateCacheNamespace("arrestee");
   return apiResponse.success(res, result, { message: "Like removed" });
 });
 
@@ -236,6 +242,7 @@ export const addDislikeController = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Arrestee not found");
   }
 
+  invalidateCacheNamespace("arrestee");
   return apiResponse.success(res, result, { message: "Dislike added" });
 });
 
@@ -247,5 +254,6 @@ export const removeDislikeController = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Arrestee not found");
   }
 
+  invalidateCacheNamespace("arrestee");
   return apiResponse.success(res, result, { message: "Dislike removed" });
 });

@@ -9,12 +9,24 @@ import {
   deletePollOptionController,
 } from "./poll.controller";
 import { attachUser, requireRoles } from "../auth/auth.middleware";
+import { cacheResponse } from "../../shared/middleware/responseCache";
 
 const pollRouter = Router();
 
+const pollListCache = cacheResponse({
+  namespace: "poll",
+  ttlSeconds: 5,
+});
+
+const pollDetailCache = cacheResponse({
+  namespace: "poll",
+  ttlSeconds: 10,
+  varyByUser: true,
+});
+
 // Public endpoints - no auth required
-pollRouter.get("/", getAllPollsController);
-pollRouter.get("/:id", getPollByIdController);
+pollRouter.get("/", pollListCache, getAllPollsController);
+pollRouter.get("/:id", pollDetailCache, getPollByIdController);
 pollRouter.post("/:id/options", addOptionToPollController);
 pollRouter.post("/vote", voteOnOptionController);
 

@@ -7,6 +7,7 @@ import { apiResponse } from "./src/shared/utils/apiResponse";
 import { errorHandler } from "./src/shared/middleware/errorHandler";
 import { authRouter } from "./src/features/auth/auth.router";
 import { corsService } from "./src/shared/utils/cors";
+import { cacheResponse } from "./src/shared/middleware/responseCache";
 import type { RequestWithRawBody } from "./src/types/global";
 
 const app = express();
@@ -27,9 +28,16 @@ app.use("/api/v1/arrestee", arresteeRouter);
 app.use("/api/v1/poll", pollRouter);
 app.use("/api/v1/auth", authRouter);
 
-app.get("/health", (req, res) => {
-  return apiResponse.success(res, "Server is healthy");
-});
+app.get(
+  "/health",
+  cacheResponse({
+    namespace: "health",
+    ttlSeconds: 30,
+  }),
+  (req, res) => {
+    return apiResponse.success(res, "Server is healthy");
+  },
+);
 
 app.use(errorHandler);
 

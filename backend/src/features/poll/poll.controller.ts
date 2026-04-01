@@ -18,6 +18,7 @@ import {
 import { asyncHandler } from "../../shared/utils/asyncHandler";
 import { apiResponse } from "../../shared/utils/apiResponse";
 import { ApiError } from "../../shared/utils/apiError";
+import { invalidateCacheNamespace } from "../../shared/middleware/responseCache";
 
 // Helper to get client IP address
 const getClientIP = (req: Request): string => {
@@ -62,6 +63,8 @@ export const createPollController = asyncHandler(
       ...validationResult.data,
       createdBy: req.user?.id!,
     });
+
+    invalidateCacheNamespace("poll");
 
     return apiResponse.created(res, poll, {
       message: "Poll created successfully",
@@ -146,6 +149,8 @@ export const voteOnOptionController = asyncHandler(
         ipAddress,
       });
 
+      invalidateCacheNamespace("poll");
+
       return apiResponse.success(res, vote, {
         statusCode: 201,
         message: "Vote recorded successfully",
@@ -175,6 +180,7 @@ export const deletePollController = asyncHandler(
     }
 
     await deletePoll(pollId);
+    invalidateCacheNamespace("poll");
 
     return apiResponse.success(
       res,
@@ -193,6 +199,7 @@ export const deletePollOptionController = asyncHandler(
     }
 
     await deletePollOption(optionId.data);
+    invalidateCacheNamespace("poll");
 
     return apiResponse.success(
       res,

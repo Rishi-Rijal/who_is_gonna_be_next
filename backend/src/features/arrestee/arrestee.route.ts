@@ -12,11 +12,22 @@ import {
 } from "./arrestee.controller";
 import { upload } from "../../shared/middleware/upload.middleware";
 import { attachUser, requireRoles } from "../auth/auth.middleware";
+import { cacheResponse } from "../../shared/middleware/responseCache";
 
 const arresteeRouter = Router();
 
-arresteeRouter.get("/", getAllArresteesController);
-arresteeRouter.get("/:id", getArresteeByIdController);
+const arresteeListCache = cacheResponse({
+  namespace: "arrestee",
+  ttlSeconds: 300,
+});
+
+const arresteeDetailCache = cacheResponse({
+  namespace: "arrestee",
+  ttlSeconds: 600,
+});
+
+arresteeRouter.get("/", arresteeListCache, getAllArresteesController);
+arresteeRouter.get("/:id", arresteeDetailCache, getArresteeByIdController);
 
 arresteeRouter.post(
   "/",
